@@ -194,13 +194,22 @@ def executer_commande(user_input, platform_context):
                     # Votre logique existante Spotify
                     recherche_encodee = quote(query.replace("-", " "))
                     os.startfile(f"spotify:search:{recherche_encodee}")
-                    time.sleep(3.5)
+                    time.sleep(2.5)
                     focus_window_containing("Spotify")
                     
                     # Logique de clic (simplifiée ici pour l'exemple, reprenez votre code complet si besoin)
                     win = gw.getActiveWindow()
-                    if win:
-                        pyautogui.doubleClick(win.left + (win.width / 2) + OFFSET_HORIZONTAL, win.top + OFFSET_VERTICAL_HEADER)
+                    pyautogui.press('tab')
+                    time.sleep(0.1)
+                    pyautogui.press('enter')
+                    time.sleep(0.1)
+                    pyautogui.press('tab')
+                    time.sleep(0.1)
+                    pyautogui.press('tab')
+                    time.sleep(0.1)
+                    pyautogui.press('enter')
+                    # if win:
+                    #     pyautogui.doubleClick(win.left + (win.width / 2) + OFFSET_HORIZONTAL, win.top + OFFSET_VERTICAL_HEADER)
 
     except Exception as e:
         print(f"❌ Erreur : {e}")
