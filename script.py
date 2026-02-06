@@ -68,6 +68,7 @@ def executer_commande(user_input, platform_context):
     Exemples :
     User: "Mets pause" -> {"type": "control", "action": "pause"}
     User: "Monte le son" -> {"type": "volume", "action": "increase"}
+    User: "Coupe le son" -> {"type": "volume", "action": "mute"}
     
     User: "Joue Asake" -> {"type": "play", "query": "Asake"}
     User: "I believe" -> {"type": "play", "query": "I believe"}
@@ -191,15 +192,20 @@ def executer_commande(user_input, platform_context):
                         pyautogui.click(win.left + (win.width / 2) - 100, win.top + 350)
                 
                 elif target_platform == 'spotify':
-                    # Votre logique existante Spotify
+                    # Si le processus Spotify est fermé, l'ouvrir et attendre trois secondes
+                    if not any("Spotify" in w.title for w in gw.getAllWindows()):
+                        print("🚀 Spotify non détecté : Lancement...")
+                        os.startfile("spotify:")
+                        time.sleep(4) # Attente pour que Spotify charge
+
                     recherche_encodee = quote(query.replace("-", " "))
                     os.startfile(f"spotify:search:{recherche_encodee}")
-                    time.sleep(2.5)
+                    time.sleep(1.5)
                     focus_window_containing("Spotify")
+                    time.sleep(1.5)
                     
                     # Logique de clic (simplifiée ici pour l'exemple, reprenez votre code complet si besoin)
                     win = gw.getActiveWindow()
-                    pyautogui.press('tab')
                     if win:
                         target_x = win.left + 830  
                         target_y = win.top + 390
@@ -224,6 +230,19 @@ def recevoir_commande():
 @app.route('/')
 def home():
     return render_template('telecommande.html')
+
+# --- NOUVELLE ROUTE POUR SIRI (GET) ---
+@app.route('/siri', methods=['GET'])
+def siri_commande():
+    # Siri enverra l'ordre directement dans l'URL : http://IP:5000/siri?ordre=Mets%20play
+    ordre = request.args.get('ordre')
+    platform = request.args.get('platform', 'spotify') # Par défaut Spotify si Siri ne précise pas
+    
+    if ordre:
+        print(f"🎤 SIRI commande : {ordre} sur {platform}")
+        threading.Thread(target=executer_commande, args=(ordre, platform)).start()
+        return "OK", 200
+    return "Pas d'ordre", 400
 
 if __name__ == '__main__':
     print(f"📡 {NOM_DU_PC} écoute sur le port {PORT_ECOUTE}...")
