@@ -1,0 +1,6 @@
+openai
+pywhatkit
+pyautogui
+pygetwindow
+flask
+requests
