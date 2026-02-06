@@ -200,16 +200,11 @@ def executer_commande(user_input, platform_context):
                     # Logique de clic (simplifiée ici pour l'exemple, reprenez votre code complet si besoin)
                     win = gw.getActiveWindow()
                     pyautogui.press('tab')
-                    time.sleep(0.1)
-                    pyautogui.press('enter')
-                    time.sleep(0.1)
-                    pyautogui.press('tab')
-                    time.sleep(0.1)
-                    pyautogui.press('tab')
-                    time.sleep(0.1)
-                    pyautogui.press('enter')
-                    # if win:
-                    #     pyautogui.doubleClick(win.left + (win.width / 2) + OFFSET_HORIZONTAL, win.top + OFFSET_VERTICAL_HEADER)
+                    if win:
+                        target_x = win.left + 830  
+                        target_y = win.top + 390
+                        pyautogui.moveTo(target_x, target_y)
+                        pyautogui.click()
 
     except Exception as e:
         print(f"❌ Erreur : {e}")
