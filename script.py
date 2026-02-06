@@ -52,23 +52,27 @@ def executer_commande(user_input, platform_context):
     system_prompt = """
     Tu es un assistant système. Réponds UNIQUEMENT en JSON.
     
-    RÈGLE CRUCIALE POUR LA RECHERCHE ("play") :
-    Tu ne dois JAMAIS résumer ou raccourcir la demande.
-    Tu dois garder LE TITRE ET L'ARTISTE dans la query.
-    
-    TYPES POSSIBLES :
-    - "play" : Lancer une recherche. Garde TOUS les mots-clés (Titre + Artiste).
-    - "control" : Contrôler la lecture (Pause, Play, Suivant, Précédent).
-    - "volume" : Actions : "increase" (monter), "decrease" (baisser), "mute" (couper).
+    RÈGLE DE DÉFAUT (IMPORTANTE) :
+    Si l'entrée de l'utilisateur ne contient pas de commande explicite (comme "pause", "volume", "monte"),
+    tu DOIS considérer que c'est un TITRE DE MUSIQUE et générer une action "play".
+    Même si c'est une phrase comme "I believe" ou "C'est la vie", c'est un titre.
 
-    Exemples CORRECTS :
+    RÈGLE CRUCIALE POUR LA RECHERCHE :
+    Ne jamais résumer. Garde tous les mots.
+
+    TYPES POSSIBLES :
+    - "play" : Lancer une recherche (Action par DÉFAUT).
+    - "control" : Contrôler la lecture (Pause, Play, Suivant, Précédent).
+    - "volume" : Actions : "increase", "decrease", "mute".
+
+    Exemples :
     User: "Mets pause" -> {"type": "control", "action": "pause"}
     User: "Monte le son" -> {"type": "volume", "action": "increase"}
     
     User: "Joue Asake" -> {"type": "play", "query": "Asake"}
-    User: "Mets Omo Ope de Asake" -> {"type": "play", "query": "Omo Ope Asake"}
-    User: "Lance Shape of You Ed Sheeran" -> {"type": "play", "query": "Shape of You Ed Sheeran"}
-    User: "Mets le clip de Rat des villes" -> {"type": "play", "query": "Rat des villes"}
+    User: "I believe" -> {"type": "play", "query": "I believe"}
+    User: "Rat des villes" -> {"type": "play", "query": "Rat des villes"}
+    User: "Booba" -> {"type": "play", "query": "Booba"}
     """
 
     print(f"🧠 Analyse : '{user_input}' pour la plateforme '{platform_context}'...")
@@ -131,44 +135,65 @@ def executer_commande(user_input, platform_context):
                 print(f"✅ Lancement sur {target_platform} : {query}")
 
                 if target_platform == 'youtube':
-                    # ANCIEN CODE : pywhatkit.playonyt(query)
-                    
-                    # NOUVEAU CODE : Lancement Chrome Profil Spécifique
-                    print(f"🚀 Lancement de YouTube sur le profil : {CHROME_PROFILE}")
-                    
-                    # 1. On crée l'URL de recherche manuellement
-                    # (Note: pywhatkit faisait une redirection "J'ai de la chance", 
-                    # ici on ouvre la page de résultats, c'est plus fiable)
+                    print(f"🚀 Action YouTube sur profil : {CHROME_PROFILE}")
                     url_youtube = f"https://www.youtube.com/results?search_query={quote(query)}"
+                    url_youtube_nohttps = f"www.youtube.com/results?search_query={quote(query)}"
+
+                    # --- LOGIQUE DE RÉUTILISATION D'ONGLET ---
+                    existing_window = None
+                    # On cherche parmi toutes les fenêtres ouvertes
+                    for win in gw.getAllWindows():
+                        # On cherche une fenêtre qui contient "YouTube" ET "Google Chrome" dans le titre
+                        if "YouTube" in win.title and "Google Chrome" in win.title:
+                            existing_window = win
+                            break
                     
-                    # 2. On construit la commande pour lancer Chrome
-                    # On utilise Popen pour ne pas bloquer le script Python
-                    subprocess.Popen([
-                        CHROME_PATH, 
-                        f"--profile-directory={CHROME_PROFILE}", 
-                        url_youtube
-                    ])
+                    if existing_window:
+                        print("🔄 Fenêtre YouTube détectée : Réutilisation...")
+                        try:
+                            if existing_window.isMinimized: existing_window.restore()
+                            existing_window.activate()
+                            time.sleep(0.5) # Pause vitale pour laisser Windows faire la mise au point
+                            
+                            # 1. Focus barre d'adresse (Ctrl+L est universel sur les navigateurs)
+                            pyautogui.hotkey('ctrl', 'l') 
+                            time.sleep(0.1)
+                            
+                            # 2. On écrit la nouvelle URL et on valide
+                            pyautogui.write(url_youtube_nohttps)
+                            pyautogui.press('enter')
+                        except Exception as e:
+                            print(f"⚠️ Erreur lors de la réutilisation : {e}")
+                            # En cas d'erreur, on force l'ouverture classique
+                            subprocess.Popen([CHROME_PATH, f"--profile-directory={CHROME_PROFILE}", url_youtube])
+                            
+                    else:
+                        print("🆕 Aucune fenêtre trouvée : Lancement propre...")
+                        # Commande pour forcer le profil spécifique (Votre méthode précédente)
+                        subprocess.Popen([
+                            CHROME_PATH, 
+                            f"--profile-directory={CHROME_PROFILE}", 
+                            url_youtube
+                        ])
+
+                    # --- SUITE (Auto-clic optionnel) ---
+                    # On attend que la page charge (que ce soit refresh ou nouvelle fenêtre)
+                    time.sleep(2) 
                     
-                    # 3. (Optionnel) Auto-play
-                    # Comme on ouvre la page de recherche, la vidéo ne se lance pas toute seule.
-                    # Si vous voulez lancer la 1ère vidéo, on peut réutiliser votre astuce du clic !
-                    time.sleep(2.5) # Attente chargement page
-                    focus_window_containing("YouTube") # On active la fenêtre
+                    # On s'assure qu'on est bien sur la fenêtre pour cliquer
+                    focus_window_containing("YouTube")
                     
-                    # Astuce : Sur YouTube, "Tab" puis "Entrée" ne marche pas toujours bien à cause des pubs.
-                    # Le plus simple est souvent de cliquer au milieu si on veut automatiser, 
-                    # ou de laisser l'utilisateur choisir.
-                    
-                    # Pour cliquer sur le premier résultat (souvent au même endroit) :
+                    # Logique de clic pour lancer la première vidéo
                     win = gw.getActiveWindow()
                     if win:
-                       # Clic un peu plus bas que Spotify car il y a souvent des filtres/shorts en haut
-                       pyautogui.click(win.left + (win.width / 2) - 100, win.top + 350)
+                        # Clic au milieu un peu vers le haut (à ajuster selon votre écran)
+                        # Le -100 en X sert à éviter les filtres latéraux
+                        pyautogui.click(win.left + (win.width / 2) - 100, win.top + 350)
                 
                 elif target_platform == 'spotify':
                     # Votre logique existante Spotify
                     recherche_encodee = quote(query.replace("-", " "))
-                    os.startfile(f"spotify:search:track:{recherche_encodee}")
+                    os.startfile(f"spotify:search:{recherche_encodee}")
                     time.sleep(3.5)
                     focus_window_containing("Spotify")
                     
