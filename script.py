@@ -6,6 +6,7 @@ import os
 import time
 import pywhatkit
 import pyautogui
+import subprocess
 import pygetwindow as gw
 from urllib.parse import quote
 import threading
@@ -20,6 +21,9 @@ NOM_DU_PC = "FIXE"
 PORT_ECOUTE = 5000 
 IP_CERVEAU = "192.168.0.120" # <--- VÉRIFIEZ L'IP DU CERVEAU
 PORT_LM = "1234"
+
+CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+CHROME_PROFILE = "Profile 2"
 # ==========================================
 
 app = Flask(__name__)
@@ -47,20 +51,24 @@ def executer_commande(user_input, platform_context):
     """
     system_prompt = """
     Tu es un assistant système. Réponds UNIQUEMENT en JSON.
-    Analyse l'ordre et le contexte.
+    
+    RÈGLE CRUCIALE POUR LA RECHERCHE ("play") :
+    Tu ne dois JAMAIS résumer ou raccourcir la demande.
+    Tu dois garder LE TITRE ET L'ARTISTE dans la query.
     
     TYPES POSSIBLES :
-    - "play" : Lancer une RECHERCHE précise (ex: "Mets Adèle").
+    - "play" : Lancer une recherche. Garde TOUS les mots-clés (Titre + Artiste).
     - "control" : Contrôler la lecture (Pause, Play, Suivant, Précédent).
-    - "volume" : Monter/Baisser le son.
+    - "volume" : Actions : "increase" (monter), "decrease" (baisser), "mute" (couper).
 
-    Exemples :
-    "Mets pause" -> {"type": "control", "action": "pause"}
-    "Suivant" -> {"type": "control", "action": "next"}
-    "Remets la lecture" -> {"type": "control", "action": "play"}
-    "Précédent" -> {"type": "control", "action": "prev"}
+    Exemples CORRECTS :
+    User: "Mets pause" -> {"type": "control", "action": "pause"}
+    User: "Monte le son" -> {"type": "volume", "action": "increase"}
     
-    "Joue Asake" -> {"type": "play", "query": "Asake"} (La plateforme dépendra du contexte utilisateur)
+    User: "Joue Asake" -> {"type": "play", "query": "Asake"}
+    User: "Mets Omo Ope de Asake" -> {"type": "play", "query": "Omo Ope Asake"}
+    User: "Lance Shape of You Ed Sheeran" -> {"type": "play", "query": "Shape of You Ed Sheeran"}
+    User: "Mets le clip de Rat des villes" -> {"type": "play", "query": "Rat des villes"}
     """
 
     print(f"🧠 Analyse : '{user_input}' pour la plateforme '{platform_context}'...")
@@ -115,7 +123,7 @@ def executer_commande(user_input, platform_context):
                     if found:
                         if action in ['pause', 'play']: pyautogui.press('k') # K = Play/Pause universel YouTube
                         elif action == 'next': pyautogui.hotkey('shift', 'n') # Suivant
-                        elif action == 'prev': pyautogui.press('j') # Recul de 10s (Précédent playlist est complexe)
+                        elif action == 'previous': pyautogui.press('j') # Recul de 10s (Précédent playlist est complexe)
 
             # --- 3. LANCEMENT RECHERCHE (Play) ---
             elif data['type'] == 'play':
@@ -123,7 +131,39 @@ def executer_commande(user_input, platform_context):
                 print(f"✅ Lancement sur {target_platform} : {query}")
 
                 if target_platform == 'youtube':
-                    pywhatkit.playonyt(query)
+                    # ANCIEN CODE : pywhatkit.playonyt(query)
+                    
+                    # NOUVEAU CODE : Lancement Chrome Profil Spécifique
+                    print(f"🚀 Lancement de YouTube sur le profil : {CHROME_PROFILE}")
+                    
+                    # 1. On crée l'URL de recherche manuellement
+                    # (Note: pywhatkit faisait une redirection "J'ai de la chance", 
+                    # ici on ouvre la page de résultats, c'est plus fiable)
+                    url_youtube = f"https://www.youtube.com/results?search_query={quote(query)}"
+                    
+                    # 2. On construit la commande pour lancer Chrome
+                    # On utilise Popen pour ne pas bloquer le script Python
+                    subprocess.Popen([
+                        CHROME_PATH, 
+                        f"--profile-directory={CHROME_PROFILE}", 
+                        url_youtube
+                    ])
+                    
+                    # 3. (Optionnel) Auto-play
+                    # Comme on ouvre la page de recherche, la vidéo ne se lance pas toute seule.
+                    # Si vous voulez lancer la 1ère vidéo, on peut réutiliser votre astuce du clic !
+                    time.sleep(2.5) # Attente chargement page
+                    focus_window_containing("YouTube") # On active la fenêtre
+                    
+                    # Astuce : Sur YouTube, "Tab" puis "Entrée" ne marche pas toujours bien à cause des pubs.
+                    # Le plus simple est souvent de cliquer au milieu si on veut automatiser, 
+                    # ou de laisser l'utilisateur choisir.
+                    
+                    # Pour cliquer sur le premier résultat (souvent au même endroit) :
+                    win = gw.getActiveWindow()
+                    if win:
+                       # Clic un peu plus bas que Spotify car il y a souvent des filtres/shorts en haut
+                       pyautogui.click(win.left + (win.width / 2) - 100, win.top + 350)
                 
                 elif target_platform == 'spotify':
                     # Votre logique existante Spotify
